@@ -1,0 +1,205 @@
+1. Configurare il progetto
+Crea un’applicazione Spring Boot denominata ecommerce-products con dipendenze:
+Spring Web, Spring Data JPA, MySQL Driver.
+Configura la connessione al database ecommerce_db gestito da XAMPP.
+Verifica che la connessione sia attiva avviando l’app.
+
+Crear la base de datos ecommerce_db manualmente en MySQL antes de ejecutar Spring Boot.
+No especificar dialecto en Hibernate 7.x (Spring Boot 4.x) - detecta automáticamente.
+Configuración correcta: spring.datasource.url=jdbc:mysql://localhost:3306/ecommerce_db con root sin contraseña.
+
+2. Modellare l’entità Prodotto
+Definisci una classe JPA Prodotto che rappresenti un prodotto di e-commerce, con i campi principali (id, nome, descrizione, prezzo, quantità disponibile, date di creazione e aggiornamento).
+La tabella dovrà chiamarsi prodotti.
+
+@Entity y @Table(name = "prodotti") convierten una clase Java en una tabla MySQL, donde cada campo es una columna.
+@Id + @GeneratedValue(strategy = GenerationType.IDENTITY) hace que el ID sea auto-incrementable en la base de datos.
+@PreUpdate actualiza automáticamente dataAggiornamento cada vez que se modifica un producto, mientras updatable = false
+ protege dataCreazione.
+
+ 3. Implementare le regole di mapping
+ Assicurati che ogni campo sia mappato correttamente sul database con vincoli e tipi coerenti
+ (es. BigDecimal per il prezzo, @Lob per la descrizione).
+ Verifica la corretta generazione della tabella in phpMyAdmin.
+
+ spring.jpa.hibernate.ddl-auto=update crea y actualiza automáticamente las tablas en MySQL
+ basándose en las entidades JPA, sin necesidad de escribir SQL manual.
+ Anotaciones clave: @Column(nullable=false, length=100), @Lob para TEXT, BigDecimal con precision=10, scale=2
+ para precios, y unique=true para evitar duplicados.
+ Solo la base de datos debe crearse manualmente (ej: ecommerce_db); Spring Boot crea las tablas (prodotti)
+ automáticamente al arrancar la aplicación.
+
+ 4. Gestire i timestamp
+ Configura la gestione automatica di dataCreazione e dataUltimoAggiornamento tramite annotazioni JPA (@PrePersist, @PreUpdate).
+ Verifica che i valori vengano generati correttamente dopo un inserimento e un aggiornamento.
+
+5. Creare il repository
+Crea un’interfaccia ProdottoRepository che estenda JpaRepository<Prodotto, Long>.
+Aggiungi almeno un metodo personalizzato per la ricerca (es. findByNome o findByPrezzoLessThan).
+Verifica il funzionamento del repository da una classe di test o nel main.
+
+Configurar application.properties con la URL de MySQL y ddl-auto=update para crear tablas automáticamente.
+Anotar las entidades con @Entity, @Id, @Column y usar @PrePersist/@PreUpdate para fechas automáticas.
+Extender JpaRepository en el repositorio para obtener métodos CRUD sin implementar código.
+
+6. Popolare il database
+Inserisci dati di esempio nel database, manualmente o tramite file data.sql.
+Verifica che le righe siano visibili in phpMyAdmin e che il repository le recuperi.
+
+7. Definire il Service Layer
+Crea un’interfaccia ProdottoService e una classe ProdottoServiceImpl.
+Implementa operazioni CRUD di base, con l’uso di transazioni (@Transactional).
+Gestisci il caso “prodotto non trovato” con eccezioni appropriate.
+
+@Service + @Transactional separa la lógica de negocio del controller y gestiona automáticamente las
+ transacciones de base de datos.
+orElseThrow(() -> new ProdottoNotFoundException(id)) lanza una excepción personalizada cuando un producto
+ no existe, permitiendo manejar el error correctamente.
+@ControllerAdvice captura globalmente la excepción y devuelve una respuesta JSON con status 404 y el
+mensaje de error.
+
+8. Isolare la logica di business
+All’interno del servizio, aggiungi una regola di dominio: ad esempio, impedire il salvataggio di prodotti con quantità negativa o prezzo nullo.
+Verifica che la logica venga applicata durante un test.
+
+CommandLineRunner permite probar el flujo completo (crear, leer, actualizar, eliminar) ejecutando código automáticamente al iniciar la aplicación.
+El Service Layer se testea directamente con métodos reales (create(), findAll(), update(), delete()) sin necesidad de Controller, usando @Autowired para inyectar el servicio.
+phpMyAdmin sirve como verificación visual: después de cada operación puedes consultar la tabla prodotti para confirmar que los datos se modificaron correctamente en la base de datos.
+
+9. Testare il servizio con il repository reale
+Scrivi un test manuale (es. in CommandLineRunner) che crei, legga, aggiorni ed elimini un prodotto tramite il service, per verificare l’intero flusso.
+Controlla i risultati in phpMyAdmin.
+
+CommandLineRunner esegue automaticamente un test completo (crea, legge, aggiorna, elimina) all'avvio dell'applicazione,
+usando @Autowired per iniettare il Service.
+Il Service Layer gestisce la logica di business (validazioni come prezzo > 0, quantità non negativa) prima di chiamare
+il Repository che interagisce con il database.
+phpMyAdmin serve come verifica visiva: dopo ogni operazione puoi controllare che la tabella prodotti rifletta correttamente
+ le modifiche.
+
+10. Gestire le eccezioni
+Gestisci l’eccezione personalizzata ProdottoNonTrovatoException e assicurati che venga sollevata quando un ID non esiste.
+Aggiungi un messaggio chiaro e leggibile nei log.
+
+ProdottoNonTrovatoException è un'eccezione personalizzata che estende RuntimeException e viene lanciata con
+ orElseThrow() quando un prodotto con un certo ID non esiste nel database.
+
+I log (log.info, log.warn, log.error) registrano messaggi chiari e contestuali per tracciare operazioni,
+errori e facilitare il debug.
+
+11. Creare il Controller REST
+Implementa un controller ProdottoController mappato su /api/prodotti.
+Espone gli endpoint CRUD (GET, POST, PUT, DELETE).
+Ogni endpoint deve delegare al service.
+
+@RestController e @RequestMapping("/api/prodotti") definiscono il base path per tutti gli endpoint CRUD.
+Ogni metodo del controller (GET, POST, PUT, DELETE) delega la logica di business al ProdottoService iniettato
+    con @Autowired.
+ResponseEntity permette di controllare lo status HTTP (200 OK, 201 CREATED, 204 NO CONTENT) e il corpo della
+    risposta.
+
+12. Testare la lettura
+Usa Postman per inviare una richiesta GET /api/prodotti e verificare la risposta in JSON contenente l’elenco dei
+prodotti presenti nel database.
+
+# GET all
+curl http://localhost:8080/api/prodotti
+
+13. Testare la creazione
+Con Postman, invia una richiesta POST /api/prodotti con un body JSON valido per creare un nuovo prodotto.
+Verifica la risposta e controlla che il nuovo record compaia in phpMyAdmin.
+
+# POST create
+curl -X POST http://localhost:8080/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Smartphone","descrizione":"Ultimo modello","prezzo":699.99,"quantitaDisponibile":50}'
+
+14. Testare la lettura singola
+Recupera il prodotto appena creato con GET /api/prodotti/{id}.
+Verifica che i dati restituiti corrispondano a quelli del database.
+
+# GET by id
+curl http://localhost:8080/api/prodotti/1
+
+15. Testare l’aggiornamento
+Aggiorna un prodotto esistente con PUT /api/prodotti/{id}.
+Verifica che il campo dataUltimoAggiornamento venga aggiornato automaticamente.
+
+# PUT update
+curl -X PUT http://localhost:8080/api/prodotti/30 \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Smartphone Pro","descrizione":"Ultimo modello","prezzo":799.99}'
+
+16. Testare l’eliminazione
+Elimina un prodotto con DELETE /api/prodotti/{id}.
+Verifica che non sia più presente nel database.
+
+# DELETE
+curl -X DELETE http://localhost:8080/api/prodotti/30
+
+17. Aggiungere una query personalizzata
+Nel repository, aggiungi un metodo findByPrezzoLessThan(BigDecimal prezzo).
+Crea un endpoint /api/prodotti/prezzo-minore-di/{prezzo}.
+Testa la ricerca in Postman.
+
+findByPrezzoLessThan genera automaticamente la query SQL per filtrare prodotti con prezzo minore.
+Endpoint /api/prodotti/prezzo-minore-di/{prezzo} espone la ricerca via HTTP.
+Postman testa il filtro verificando i risultati.
+
+curl http://localhost:8080/api/prodotti/prezzo-minore-di/100
+
+18. Aggiungere una ricerca testuale
+Aggiungi un metodo findByNomeContainingIgnoreCase(String keyword) nel repository.
+Esponi un endpoint /api/prodotti/search/{keyword} e verifica che funzioni correttamente con Postman.
+
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone Galaxy","descrizione":"Ultimo modello","prezzo":699.99,"quantitaDisponibile":10}'
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone iPhone","descrizione":"Ultimo modello","prezzo":899.99,"quantitaDisponibile":5}'
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Tablet iPad","descrizione":"Ultimo modello","prezzo":499.99,"quantitaDisponibile":8}'
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Laptop Pro","descrizione":"Ultimo modello","prezzo":1299.99,"quantitaDisponibile":3}'
+
+curl http://localhost:8080/api/prodotti/search/smartphone
+
+findByNomeContainingIgnoreCase genera una query SQL LIKE '%keyword%' case-insensitive per cercare parole chiave
+    nel nome.
+L'endpoint /api/prodotti/search/{keyword} accetta la keyword nel path e restituisce tutti i prodotti che la
+    contengono nel nome.
+La ricerca è parziale e case-insensitive: "smart" trova "Smartphone", "PHONE" funziona uguale.
+
+19. Gestire prodotti esauriti
+Crea un endpoint /api/prodotti/esauriti che restituisca tutti i prodotti con quantità = 0.
+Verifica il corretto filtraggio in Postman.
+
+curl -X PUT http://localhost:8080/api/prodotti/esauriti -H "Content-Type: application/json"
+curl http://localhost:8080/api/prodotti/search/findQuantitaDisponibileCero
+
+@Query define una consulta JPQL (no SQL nativo) que selecciona productos donde quantitaDisponibile es igual al parámetro :zero.
+@Param("zero") vincula el valor del parámetro del método (int zero) con el parámetro nombrado :zero en la consulta JPQL.
+Es segura contra SQL Injection porque usa parámetros nombrados en lugar de concatenar strings, y Hibernate escapa automáticamente los valores.
+
+20. Validazione dei dati
+Aggiungi annotazioni di validazione (@NotNull, @Positive) nei campi del modello Prodotto.
+Testa il comportamento in Postman inviando dati non validi e verifica che venga restituito 400 Bad Request.
+
+@Valid + annotazioni come @NotNull, @Positive, @NotBlank nel modello validano automaticamente i dati ricevuti dal client.
+MethodArgumentNotValidException viene catturata dal GlobalExceptionHandler che restituisce status 400 Bad Request con i dettagli degli errori.
+Test in Postman/curl con dati non validi (nome vuoto, prezzo negativo, quantità negativa) verifica che la validazione funzioni correttamente.
+
+$ curl -X POST http://localhost:8080/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"","prezzo":99.99,"quantitaDisponibile":10}'
+{"nome":"Il nome non può essere vuoto"}
+
+$ curl -X POST http://localhost:8080/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Prodotto","prezzo":-10,"quantitaDisponibile":10}'
+{"prezzo":"Il prezzo minimo è 0.01"}
+
+$ curl -X POST http://localhost:8080/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Prodotto","prezzo":99.99,"quantitaDisponibile":-5}'
+{"quantitaDisponibile":"La quantità non può essere negativa"}
+
+$ curl -X POST http://localhost:8080/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Prodotto Valido","prezzo":99.99,"quantitaDisponibile":10}'
+{"nome":"Prodotto Valido","descrizione":null,"prezzo":99.99,"quantitaDisponibile":10,"dataAggiornamento":"2026-06-07T01:01:14.367306","dataCreazione":"2026-06-07T01:01:14.367306","id":47}
