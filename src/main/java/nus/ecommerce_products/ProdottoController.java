@@ -4,12 +4,17 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/prodotti")
@@ -59,6 +64,42 @@ public class ProdottoController {
         return ResponseEntity.ok(prodotti);
     }
 
+    @GetMapping("/sort")
+    public ResponseEntity<List<Prodotto>> getAllProdottiSort(
+            @RequestParam(name = "sort", required = false, defaultValue = "id") String sort) {
+        //Sort sort = Sort.by(sortParam).ascending();
+
+        log.info("📋 GET /api/prodotti?sort={}", sort);
+        List<Prodotto> prodotti = prodottoService.getAllProdottiSort(sort);
+        return ResponseEntity.ok(prodotti);
+    }
+
+    // Endpoint con paginazione
+    @GetMapping("/paginati")
+    public ResponseEntity<Page<Prodotto>> getProdottiPaginati(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "id") String sortBy) {
+
+        log.info("📋 GET /api/prodotti/paginati?page={}&size={}&sortBy={}", page, size, sortBy);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy).ascending());
+        Page<Prodotto> prodotti = prodottoService.findAllWithPagination(pageable);
+
+        return ResponseEntity.ok(prodotti);
+    }
+
+    // ✅ PATCH - Aggiornamento parziale
+    @PatchMapping("/{id}")
+    public ResponseEntity<Prodotto> patchUpdate(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updates) {
+
+        log.info("🔧 PATCH /api/prodotti/{} - Aggiornamento parziale", id);
+        Prodotto updated = prodottoService.patchUpdate(id, updates);
+        return ResponseEntity.ok(updated);
+    }
+
     // POST create - Crea un nuovo prodotto
     @PostMapping
     public ResponseEntity<Prodotto> createProdotto(@Valid @RequestBody Prodotto prodotto) {
@@ -89,5 +130,26 @@ public class ProdottoController {
         log.info("🗑️ DELETE /api/prodotti/{} - Eliminazione prodotto", id);
         prodottoService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ✅ Endpoint per decrementare la quantità dopo una vendita
+    @PostMapping("/{id}/vendita")
+    public ResponseEntity<Prodotto> vendita(
+            @PathVariable Long id,
+            @RequestBody Map<String, Integer> request) {
+
+        int quantitaVenduta = request.get("quantita");
+        log.info("🏷️ POST /api/prodotti/{}/vendita - Quantità: {}", id, quantitaVenduta);
+
+        Prodotto prodotto = prodottoService.decrementaQuantita(id, quantitaVenduta);
+        return ResponseEntity.ok(prodotto);
+    }
+
+    // ✅ NUOVO ENDPOINT PER STATISTICHE
+    @GetMapping("/statistiche")
+    public ResponseEntity<ProdottoStats> getStatistics() {
+        log.info("📊 GET /api/prodotti/statistiche - Richiesta statistiche");
+        ProdottoStats stats = prodottoService.getStatistics();
+        return ResponseEntity.ok(stats);
     }
 }

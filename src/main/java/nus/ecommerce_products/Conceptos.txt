@@ -110,9 +110,7 @@ Con Postman, invia una richiesta POST /api/prodotti con un body JSON valido per 
 Verifica la risposta e controlla che il nuovo record compaia in phpMyAdmin.
 
 # POST create
-curl -X POST http://localhost:8080/api/prodotti \
-  -H "Content-Type: application/json" \
-  -d '{"nome":"Smartphone","descrizione":"Ultimo modello","prezzo":699.99,"quantitaDisponibile":50}'
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone","descrizione":"Ultimo modello","prezzo":699.99,"quantitaDisponibile":50}'
 
 14. Testare la lettura singola
 Recupera il prodotto appena creato con GET /api/prodotti/{id}.
@@ -203,3 +201,201 @@ $ curl -X POST http://localhost:8080/api/prodotti \
   -H "Content-Type: application/json" \
   -d '{"nome":"Prodotto Valido","prezzo":99.99,"quantitaDisponibile":10}'
 {"nome":"Prodotto Valido","descrizione":null,"prezzo":99.99,"quantitaDisponibile":10,"dataAggiornamento":"2026-06-07T01:01:14.367306","dataCreazione":"2026-06-07T01:01:14.367306","id":47}
+
+MODULO 2 – Approfondimenti, Transazioni e Testing (21–40)
+
+21. Implementare gestione centralizzata degli errori
+Crea una classe GlobalExceptionHandler con @ControllerAdvice e @ExceptionHandler per intercettare errori
+come ProdottoNonTrovatoException.
+Verifica che il messaggio restituito sia in formato JSON.
+
+No escribes código de rollback - Spring lo hace automáticamente
+Solo necesitas @Transactional en el Service
+Cuando lanzas RuntimeException, Spring hace rollback automático ✅
+
+23. Aggiungere ordinamento
+Permetti di ordinare i prodotti per prezzo o nome tramite query parameters (es. GET /api/prodotti?sort=prezzo).
+Verifica che Spring Data gestisca correttamente l’ordinamento.
+
+$ curl http://localhost:8080/api/prodotti/sort
+[{"nome":"Zaino","descrizione":null,"prezzo":49.99,"quantitaDisponibile":20,"dataAggiornamento":"2026-06-07T21:52:17","dataCreazione":"2026-06-07T21:52:17","id":1},{"nome":"Astuccio","descrizione":null,"prezzo":12.99,"quantitaDisponibile":50,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":2},{"nome":"Diario","descrizione":null,"prezzo":8.99,"quantitaDisponibile":30,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":3}]
+
+$ curl "http://localhost:8080/api/prodotti/sort?sort=prezzo_asc"
+[{"nome":"Diario","descrizione":null,"prezzo":8.99,"quantitaDisponibile":30,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":3},{"nome":"Astuccio","descrizione":null,"prezzo":12.99,"quantitaDisponibile":50,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":2},{"nome":"Zaino","descrizione":null,"prezzo":49.99,"quantitaDisponibile":20,"dataAggiornamento":"2026-06-07T21:52:17","dataCreazione":"2026-06-07T21:52:17","id":1}]
+
+$ curl "http://localhost:8080/api/prodotti/sort?sort=prezzo_desc"
+[{"nome":"Zaino","descrizione":null,"prezzo":49.99,"quantitaDisponibile":20,"dataAggiornamento":"2026-06-07T21:52:17","dataCreazione":"2026-06-07T21:52:17","id":1},{"nome":"Astuccio","descrizione":null,"prezzo":12.99,"quantitaDisponibile":50,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":2},{"nome":"Diario","descrizione":null,"prezzo":8.99,"quantitaDisponibile":30,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":3}]
+
+$ curl "http://localhost:8080/api/prodotti/sort?sort=nome_desc"
+[{"nome":"Zaino","descrizione":null,"prezzo":49.99,"quantitaDisponibile":20,"dataAggiornamento":"2026-06-07T21:52:17","dataCreazione":"2026-06-07T21:52:17","id":1},{"nome":"Diario","descrizione":null,"prezzo":8.99,"quantitaDisponibile":30,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":3},{"nome":"Astuccio","descrizione":null,"prezzo":12.99,"quantitaDisponibile":50,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":2}]
+
+$ curl "http://localhost:8080/api/prodotti/sort?sort=nome_asc"
+[{"nome":"Astuccio","descrizione":null,"prezzo":12.99,"quantitaDisponibile":50,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":2},{"nome":"Diario","descrizione":null,"prezzo":8.99,"quantitaDisponibile":30,"dataAggiornamento":"2026-06-07T21:52:18","dataCreazione":"2026-06-07T21:52:18","id":3},{"nome":"Zaino","descrizione":null,"prezzo":49.99,"quantitaDisponibile":20,"dataAggiornamento":"2026-06-07T21:52:17","dataCreazione":"2026-06-07T21:52:17","id":1}]
+
+@RequestParam captura el parámetro ?sort=prezzo de la URL para definir el campo de ordenamiento.
+
+Sort.by("prezzo").ascending() crea el objeto que Spring Data convierte en ORDER BY prezzo ASC.
+
+Un solo endpoint maneja todos los casos usando defaultValue = "id" cuando no se especifica el parámetro.
+
+24. Aggiungere paginazione
+Aggiungi supporto per la paginazione usando Pageable nei metodi di repository e controller.
+Testa con Postman usando parametri page e size.
+
+# Creare 15 prodotti di test
+for i in {1..15}; do
+  curl -X POST http://localhost:8080/api/prodotti \
+    -H "Content-Type: application/json" \
+    -d "{\"nome\":\"Prodotto $i\",\"prezzo\":$((i * 10)),\"quantitaDisponibile\":$((i * 5))}"
+done
+
+$ curl "http://localhost:8080/api/prodotti/paginati?page=0&size=5"
+$ curl "http://localhost:8080/api/prodotti/paginati?page=1&size=5"
+$ curl "http://localhost:8080/api/prodotti/paginati?page=2&size=5"
+
+Pageable + PageRequest.of(page, size, sort) gestisce automaticamente la paginazione generando query SQL con LIMIT e OFFSET.
+L'endpoint accetta parametri ?page=0&size=5&sortBy=prezzo per controllare pagina, dimensione e ordinamento.
+La risposta Page<Prodotto> include non solo i dati (content) ma anche metadati come totalPages, totalElements, first, last.
+
+25. Gestire aggiornamenti parziali
+Aggiungi un endpoint PATCH /api/prodotti/{id} che permetta di aggiornare solo alcuni campi (es. solo prezzo o descrizione).
+Verifica in Postman che i campi non inviati non vengano alterati.
+
+curl -X POST http://localhost:8081/api/prodotti \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Smartphone","descrizione":"Telefono potente","prezzo":699.99,"quantitaDisponibile":50}'
+
+curl -X PATCH http://localhost:8081/api/prodotti/1 \
+  -H "Content-Type: application/json" \
+  -d '{"prezzo":599.99}'
+
+curl -X PATCH http://localhost:8081/api/prodotti/1 -H "Content-Type: application/json" -d '{"prezzo":599.99}'
+
+ @PatchMapping accetta una Map<String, Object> con solo i campi da aggiornare, senza modificare quelli non inviati.
+ Nel Service, si itera sulla mappa e si aggiornano solo i campi presenti, con validazioni specifiche per ogni campo.
+ PUT sostituisce l'intero oggetto (campi non inviati diventano null), mentre PATCH aggiorna solo i campi specificati.
+
+27. Aggiungere un controllo logico di dominio
+Inserisci una regola: non è possibile impostare un prezzo inferiore a 1.00.
+Verifica che venga sollevata un’eccezione se la regola viene violata.
+
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone","descrizione":"Ultimo modello","prezzo":1,"quantitaDisponibile":50}'
+{"prezzo":"La quantità può essere mayorene a 1"}
+
+@DecimalMin("1.00") en el modelo valida automáticamente que el precio no sea inferior a 1.00.
+@Valid en el Controller activa la validación y lanza MethodArgumentNotValidException si la regla se viola.
+No se necesita código manual en el Service porque Spring + Hibernate Validator aplican la regla automáticamente.
+
+28. Integrare una logica di business
+Aggiungi un metodo decrementaQuantita(Long id, int quantitaVenduta) nel service che aggiorni la quantità dopo una vendita.
+Verifica la transazione e la consistenza dei dati.
+
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone","prezzo":299.99,"quantitaDisponibile":10}'
+{"nome":"Smartphone","descrizione":null,"prezzo":299.99,"quantitaDisponibile":10,"dataAggiornamento":"2026-06-07T23:04:50.5987928","dataCreazione":"2026-06-07T23:04:50.5987928","id":1}
+
+$ curl -X POST http://localhost:8080/api/prodotti/1/vendita -H "Content-Type: application/json" -d '{"quantita":3}'
+{"nome":"Smartphone","descrizione":null,"prezzo":299.99,"quantitaDisponibile":7,"dataAggiornamento":"2026-06-07T23:05:19.6190487","dataCreazione":"2026-06-07T23:04:50","id":1}
+
+$ curl http://localhost:8080/api/prodotti/1
+{"nome":"Smartphone","descrizione":null,"prezzo":299.99,"quantitaDisponibile":7,"dataAggiornamento":"2026-06-07T23:05:19","dataCreazione":"2026-06-07T23:04:50","id":1}
+
+decrementaQuantita(Long id, int quantitaVenduta) verifica che il prodotto esista, che la quantità venduta sia positiva e che lo stock sia sufficiente prima di decrementare.
+@Transactional garantisce la consistenza dei dati: se una validazione fallisce, la transazione viene annullata (rollback) e la quantità non viene modificata.
+L'endpoint POST /api/prodotti/{id}/vendita riceve la quantità venduta e restituisce il prodotto con la nuova quantità disponibile aggiornata.
+
+29. Verificare le date di aggiornamento
+Dopo ogni modifica, controlla che il campo dataUltimoAggiornamento cambi, mentre dataCreazione resti invariata.
+
+dataCreazione → si imposta una sola volta alla creazione e non si modifica mai.
+dataUltimoAggiornamento → si aggiorna ogni volta che l'oggetto viene modificato.
+Regola d'oro: La data di creazione resta invariata, quella di aggiornamento cambia sempre.
+
+30. Aggiungere un logger
+Integra un logger (SLF4J) nel service per tracciare le operazioni CRUD.
+Verifica in console la corretta emissione dei log.
+
+private static final Logger log = LoggerFactory.getLogger(Clase.class); es la declaración estándar para SLF4J.
+Usa log.info() para operaciones normales, log.warn() para anomalías y log.debug() para detalles.
+Los logs aparecen automáticamente en consola y ayudan a monitorear la aplicación en producción.
+
+31. Gestire eccezioni di integrità referenziale
+Prova a cancellare un prodotto collegato (se aggiungi relazioni).
+Gestisci con un messaggio esplicativo all’utente.
+
+
+32. Testare la validazione
+Invia da Postman un prodotto con prezzo = 0 o quantitaDisponibile = -1.
+Verifica che venga restituito un errore HTTP 400.
+
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone","prezzo":500.0,"quantitaDisponibile":-1}'
+{"quantitaDisponibile":"La quantità non può essere negativa"}
+
+curl -X POST http://localhost:8080/api/prodotti -H "Content-Type: application/json" -d '{"nome":"Smartphone","prezzo":0,"quantitaDisponibile":10}'
+{"prezzo":"Il prezzo deve essere maggiore di zero"}
+
+33. Aggiungere un endpoint per statistiche
+Crea /api/prodotti/statistiche che restituisca:
+numero totale di prodotti
+numero di prodotti esauriti
+prezzo medio.
+Verifica la correttezza in Postman.
+
+Repository solo para consultas a BD: findBy..., countBy..., @Query.
+Service para lógica de negocio y cálculos con Stream API como filter(), map(), average().
+Nunca pongas métodos con stream() en Repository; Spring los malinterpreta como propiedades de la entidad.
+Repository solo consultas BD, Service lógica de negocio y crea DTOs con new para devolver datos calculados.
+
+curl http://localhost:8080/api/prodotti/statistiche
+{"totalProdotti":2,"prodottiEsauriti":1,"prezzoMedio":400.0}
+
+
+34. Creare un DTO
+Crea una classe ProdottoDTO per esporre solo alcuni campi (es. nome, prezzo).
+Modifica un endpoint per restituire DTO invece di entità.
+
+
+35. Implementare un filtro personalizzato
+Aggiungi un filtro (es. GET /api/prodotti/filter?prezzoMin=...&prezzoMax=...).
+Verifica che la query funzioni con parametri opzionali.
+
+
+36. Aggiungere test automatici
+Scrivi un test JUnit per verificare che creaProdotto() salvi correttamente un record in MySQL.
+Usa @DataJpaTest o @SpringBootTest.
+
+
+37. Profilo di test
+Configura un profilo test con database separato (ecommerce_test) e verifica che i test non tocchino i dati reali.
+
+
+38. Migliorare la risposta REST
+Rendi le risposte più esplicite includendo un messaggio di successo o errore in formato JSON standard (es. { "status": "ok", "data": [...] }).
+
+
+39. Documentare gli endpoint
+Aggiungi commenti Javadoc e, se possibile, integra Springdoc OpenAPI o Swagger UI per generare la documentazione automatica.
+
+
+40. Eseguire una revisione completa
+Testa l’intera API con Postman:
+CRUD completo
+query personalizzate
+validazioni e transazioni
+gestione errori.
+Verifica i risultati nel database MySQL e salva gli screenshot per il report finale.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -24,6 +24,7 @@ public class Prodotto {
     private String descrizione;
 
     @NotNull(message = "Il prezzo è obbligatorio")
+    @Min(value = 2, message = "La quantità può essere mayorene a 1")
     @Positive(message = "Il prezzo deve essere maggiore di zero")
     @DecimalMin(value = "0.01", message = "Il prezzo minimo è 0.01")
     @Column(nullable = false, precision = 10, scale = 2)

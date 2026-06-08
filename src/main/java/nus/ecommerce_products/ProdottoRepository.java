@@ -1,5 +1,8 @@
 package nus.ecommerce_products;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,6 +32,11 @@ public interface ProdottoRepository extends JpaRepository<Prodotto, Long> {
     @Query("SELECT p FROM Prodotto p WHERE p.quantitaDisponibile= :zero")
     List<Prodotto> findQuantitaDisponibileCero(@Param("zero") int zero);
 
+    //List<Prodotto> getAllProdottiSort(String sort);
+
     // 6. Contare prodotti con prezzo maggiore di
     long countByPrezzoGreaterThan(BigDecimal prezzo);
+
+    // ✅ Metodo con paginazione
+    Page<Prodotto> findAll(Pageable pageable);
 }
